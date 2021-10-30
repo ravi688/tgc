@@ -1,48 +1,50 @@
-CC ?= gcc
-AR ?= ar
-CFLAGS = -ansi -O3 -fpic -pedantic -g -Wall -Wno-unused
-LFLAGS = -fpic
-ECFLAGS = -std=c99 -O3 -g
 
-INCDIR = $(PREFIX)/include
-LIBDIR = $(PREFIX)/lib
+DEFINES = 
 
-OBJECT = tgc.o
-STATIC = libtgc.a
-DYNAMIC = libtgc.so
+#header files (.h)
+INCLUDES = -I.\
+#source code (.c) 
+SOURCES = tgc.c
+#output library
+LIB = .\lib\tgc.a
+LIB_DIR = .\lib
+#compilation flags
+CFLAGS = -m64
+STATIC_LIB_COMPILATION_FLAGS = -rc
+ARCHIVER = ar
 
-ifeq ($(findstring MINGW,$(shell uname)),MINGW)
-  CHECKER = 
-else 
-  CHECKER = valgrind --undef-value-errors=no  --leak-check=full 
-endif
 
-all: $(STATIC) $(DYNAMIC)
+OBJECTS = $(addsuffix .o, $(basename $(SOURCES)))
 
-$(OBJECT): tgc.c tgc.h
-	$(CC) -c $(CFLAGS) tgc.c
+all: release
+.PHONY: main clean
 
-$(DYNAMIC): $(OBJECT)
-	$(CC) -shared -o $@ $^
+%.o : %.c
+	gcc $(DEFINES) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-$(STATIC): $(OBJECT)
-	$(AR) rcs $@ $^
+.PHONY: debug release
 
-install:
-	cp -f $(STATIC) $(LIBDIR)
-	cp -f tgc.h $(INCDIR)
+debug: DEFINES += -DGLOBAL_DEBUG
+debug: main
 
-check:
-	$(CC) $(ECFLAGS) examples/basic.c tgc.c -o ./examples/basic && \
-$(CHECKER) ./examples/basic
-	$(CC) $(ECFLAGS) examples/advanced.c tgc.c -o ./examples/advanced && \
-$(CHECKER) ./examples/advanced  
-	$(CC) $(ECFLAGS) examples/bzip2.c tgc.c -o ./examples/bzip2 && \
-$(CHECKER) ./examples/bzip2 -c ./examples/Lenna.png -9 > ./examples/Lenna.png.bz
-	$(CC) $(ECFLAGS) examples/mpc.c tgc.c -o ./examples/mpc && \
-$(CHECKER) ./examples/mpc ./examples/prelude.lspy
-	$(CC) $(ECFLAGS) examples/oggenc.c tgc.c -lm -o ./examples/oggenc && \
-$(CHECKER) ./examples/oggenc ./examples/jfk.wav  
+release: DEFINES += -DGLOBAL_RELEASE
+release: main
 
-clean:
-	rm -rf $(STATIC) $(DYNAMIC) $(OBJECT)
+.PHONY: lib-static lib-static-debug lib-static-release
+lib-static :  lib-static-release 
+lib-static-debug: DEFINES += -DGLOBAL_DEBUG
+lib-static-debug: $(LIB)
+lib-static-release: DEFINES += -DGLOBAL_RELEASE
+lib-static-release: $(LIB)
+
+$(LIB_DIR) : 
+	mkdir $@
+
+$(LIB): $(OBJECTS) | $(LIB_DIR)
+	$(ARCHIVER) $(STATIC_LIB_COMPILATION_FLAGS) $@ $^ 
+	@echo [Log] tgc.a build successfully
+
+clean: 
+	del $(OBJECTS)
+	del $(LIB)
+	rmdir $(LIB_DIR)
